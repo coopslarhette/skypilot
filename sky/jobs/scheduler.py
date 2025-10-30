@@ -185,18 +185,25 @@ def start_controller() -> None:
 
 
 def get_alive_controllers() -> typing.Optional[int]:
+    logger.info(f"looking for PIDs in {JOB_CONTROLLER_PID_PATH}")
     if not os.path.exists(JOB_CONTROLLER_PID_PATH):
+        logger.info(f"PID path doens't exist")
         # if the file doesn't exist, it means the controller server is not
         # running, so we return 0
         return 0
 
     try:
         with open(JOB_CONTROLLER_PID_PATH, 'r', encoding='utf-8') as f:
-            pids = f.read().split('\n')[:-1]
+            text = f.read()
+            logger.info(f"PID file text content {text}")
+            pids = text.split('\n')[:-1]
     except OSError:
+        logger.exception("PID file reading raised OSError")
         # if the file is corrupted, or any issues with reading it, we just
         # return None to be safe and not over start
         return None
+
+    logger.info(f"PID list: {pids}")
 
     alive = 0
     for pid in pids:
@@ -206,8 +213,12 @@ def get_alive_controllers() -> typing.Optional[int]:
             # include a random UUID with each controller and store that in the
             # db as well/in the command that spawns it.
             if subprocess_utils.is_process_alive(int(pid.strip())):
+                logger.info(f"PID {int(pid.strip())} is alive")
                 alive += 1
+            else:
+                logger.info(f"PID {pid} is not alive, needs to be started")
         except ValueError:
+            logger.exception("error casting to int")
             # if the pid is not an integer, let's assume it's alive to not
             # over start new processes
             alive += 1
@@ -256,6 +267,8 @@ def maybe_start_controllers(from_scheduler: bool = False) -> None:
                 return
             wanted = get_number_of_controllers()
             started = 0
+
+            logger.info(f"alive controller count {alive}, wanted controller count {wanted}")
 
             while alive + started < wanted:
                 start_controller()
